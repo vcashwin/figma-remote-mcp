@@ -1664,6 +1664,23 @@
     "type": "object"
    },
    "nodeIds": "SingleField"
+  },
+  {
+    "name": "run_script",
+    "description": "Run JavaScript against Figma's Plugin API in the open file, as the body of an async function with `figma` in scope: top-level `await` works and `return` sends a JSON-serializable answer back (thrown errors come back as the error). Use it for what the single-purpose tools can't do: combine components into variant sets (figma.combineAsVariants), create instances (component.createInstance()), add component properties, draw vectors from SVG (figma.createNodeFromSvg), bind variables, create variable collections and modes, or many edits in one call. Switch pages with `await figma.setCurrentPageAsync(page)` (figma.currentPage = … is not supported); load fonts with figma.loadFontAsync before editing text. The call gives up after 120 s.",
+    "inputSchema": {
+      "properties": {
+        "code": {
+          "description": "The script: the body of an async function (top-level await, `return` for the answer).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "type": "object"
+    },
+    "nodeIds": "None"
   }
  ],
  "prompts": [

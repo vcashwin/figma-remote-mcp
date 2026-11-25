@@ -145,7 +145,7 @@ test('dispatch: initialize, the plugin catalog with fileKey, plugin calls, promp
   assert.equal(/** @type {any} */ (await rpc('initialize', { protocolVersion: '1999-01-01', clientInfo: { name: 'claude-code', version: '2' } })).result.protocolVersion, '2025-06-18');
 
   const list = /** @type {any} */ (await rpc('tools/list')).result.tools;
-  assert.equal(list.length, 71);
+  assert.equal(list.length, 72);
   assert.ok(list.every((/** @type {any} */ t) => t.inputSchema.properties.fileKey), 'every tool takes fileKey');
   assert.ok(!list.some((/** @type {any} */ t) => t.name.startsWith('dev_mode_')));
   assert.equal(engines, 0, 'listing needs no editor');

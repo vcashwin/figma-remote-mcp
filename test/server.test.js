@@ -152,7 +152,7 @@ test('register → consent → Figma approval (pasted link) → code → token �
   assert.equal(s.pool.warmed, 1, 'initialize starts the editor');
   assert.equal((await init.json()).result.serverInfo.name, 'figma-remote-mcp');
   const list = await (await mcp({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, sid)).json();
-  assert.equal(list.result.tools.length, 71);
+  assert.equal(list.result.tools.length, 72);
   assert.ok(list.result.tools[0].inputSchema.properties.fileKey);
   const called = await (await mcp({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'get_metadata', arguments: { fileKey: 'abc' } } }, sid)).json();
   assert.deepEqual(called.result, { content: [{ type: 'text', text: 'get_metadata ok' }] });

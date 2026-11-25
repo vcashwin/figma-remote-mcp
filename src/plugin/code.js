@@ -2408,6 +2408,15 @@ var __async = (__this, __arguments, generator) => {
       }
     });
   };
+  // run_script (figma-remote-mcp's addition): the caller's JavaScript as the body of an async function with `figma`
+  // in scope, like Figma's own use_figma: top-level await, `return` for the answer (JSON), thrown errors as the error.
+  const runScript = (request) => __async(null, null, function* () {
+    const code = String((request.params || {}).code || "");
+    const run = new Function("figma", "return (async () => {\n" + code + "\n})();");
+    const result = yield run(figma);
+    figma.commitUndo();
+    return { type: request.type, requestId: request.requestId, data: result === void 0 ? null : JSON.parse(JSON.stringify(result)) };
+  });
   const handleRequest = (request) => __async(null, null, function* () {
     var _a;
     clearStyleCache();
@@ -2415,6 +2424,7 @@ var __async = (__this, __arguments, generator) => {
     const fast = FAST_TRAVERSAL.has(request.type);
     if (fast) figma.skipInvisibleInstanceChildren = true;
     try {
+      if (request.type === "run_script") return yield runScript(request);
       const result = (_a = yield handleReadRequest(request)) != null ? _a : yield handleWriteRequest(request);
       if (result === null)
         throw new Error(`Unknown request type: ${request.type}`);
