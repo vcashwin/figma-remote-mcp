@@ -19,11 +19,13 @@ export const CONTEXT_OPTIONS = { userAgent: USER_AGENT, viewport: { width: 1440,
 
 /**
  * An error carrying a code: 'auth' (signed out: sign in again), 'forbidden' (Figma refuses this account here),
- * 'unavailable' (try again).
- * @param {'auth' | 'forbidden' | 'unavailable'} code @param {string} message
+ * 'unavailable' (try again), 'gone' (the editor page crashed or closed: open the file again).
+ * @param {'auth' | 'forbidden' | 'unavailable' | 'gone'} code @param {string} message
  */
 export const figmaError = (code, message) => Object.assign(new Error(message), { code });
 export const signedOutError = () => figmaError('auth', 'The Figma session has ended. Sign in again.');
+/** Whether to open the most recently used file on `initialize` (FIGMA_WARM=0 turns it off) */
+export const WARM = process.env.FIGMA_WARM !== '0';
 /** Whether an error means Figma signed this session out @param {unknown} err */
 export const isSignedOut = (err) => /** @type {any} */ (err)?.code === 'auth';
 

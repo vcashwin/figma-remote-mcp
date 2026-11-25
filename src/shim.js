@@ -136,6 +136,7 @@ export function desktopShim(plugins = []) {
   let req = /** @type {any} */ (null);
   /** @param {string} needle @param {(exports: any) => any} pick */
   const findExport = (needle, pick) => {
+    if (!w.rspackChunk_figma_web_bundler) throw new Error("Figma's code hasn't loaded yet.");
     if (!req) w.rspackChunk_figma_web_bundler.push([[`figma-remote-${Date.now()}`], {}, (/** @type {any} */ r) => (req = r)]);
     for (const id of Object.keys(req.m)) {
       if (!String(req.m[id]).includes(needle)) continue;
@@ -159,6 +160,8 @@ export function desktopShim(plugins = []) {
   /** @type {Map<string, (m: any) => void>} */
   const replies = new Map();
   let hooked = false;
+  /** The main thread has spoken (its startup status): its figma.ui.onmessage is set, so requests won't be dropped. */
+  let heard = false;
   const hookUi = () => {
     if (hooked) return;
     const Host = findExport('Shim Plugin Iframe', (e) => Object.values(e).find((v) => /** @type {any} */ (v)?.prototype?.createInnerIframe));
@@ -169,6 +172,7 @@ export function desktopShim(plugins = []) {
       const post = inner.postMessage.bind(inner);
       inner.postMessage = (/** @type {any} */ msg, /** @type {any} */ opts) => {
         const m = msg?.pluginMessage;
+        if (m) heard = true;
         // progress frames carry the request id too; the answer is the frame without `progress`
         if (m?.requestId && !('progress' in m)) replies.get(m.requestId)?.(m);
         return post(msg, opts);
@@ -191,11 +195,17 @@ export function desktopShim(plugins = []) {
       pluginsAllowed: () => typeof w.figma === 'object' && w.figma !== null,
       /** What Figma says about the open file: loaded, and whether this account may edit it and run plugins in it */
       fileState() {
-        const st = store().getState();
-        return { loaded: !!st.mirror?.appModel?.isInitialized, canEdit: st.openFile?.canEdit, canRunExtensions: st.openFile?.canRunExtensions };
+        // while the page is still loading Figma's code, nothing is known yet
+        if (!w.rspackChunk_figma_web_bundler) return { loaded: false };
+        try {
+          const st = store().getState();
+          return { loaded: !!st.mirror?.appModel?.isInitialized, canEdit: st.openFile?.canEdit, canRunExtensions: st.openFile?.canRunExtensions };
+        } catch {
+          return { loaded: false };
+        }
       },
       /** Whether the plugin's main thread is running and listening */
-      pluginRunning: () => !!toMain,
+      pluginRunning: () => !!toMain && heard,
       /** Runs local plugin `id` the way Plugins › Development › <name> does. @param {number} id */
       runPlugin(id) {
         const s = store();
