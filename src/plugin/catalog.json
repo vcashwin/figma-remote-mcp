@@ -1,0 +1,1731 @@
+{
+ "source": "figma-mcp-rust v0.2.2 (MIT, github.com/alvinindra/figma-mcp-rust, a port of github.com/vkhanhqui/figma-mcp-go)",
+ "tools": [
+  {
+   "name": "get_document",
+   "description": "Get the full node tree of the current page (not the whole file \u2014 only the active page). Returns all nodes recursively and can be very large. Prefer get_design_context for exploration or when token efficiency matters.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_pages",
+   "description": "List all pages in the document with their IDs and names. Lightweight alternative to get_document.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_metadata",
+   "description": "Get metadata about the current Figma document: file name, pages, current page.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_selection",
+   "description": "Get the nodes currently selected in Figma. Returns an empty array if nothing is selected. Use get_design_context or get_node to retrieve deeper detail about a specific node by ID.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_node",
+   "description": "Get a single node by ID with full detail. Use get_nodes_info to fetch multiple nodes in one round-trip instead of calling this repeatedly. Node ID must be colon format e.g. '4029:12345', never hyphens.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "get_nodes_info",
+   "description": "Get full details for multiple nodes by ID in one round-trip. Prefer this over calling get_node repeatedly when you need several nodes.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "List of node IDs in colon format e.g. ['4029:12345', '4029:67890']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "get_design_context",
+   "description": "Get a depth-limited, token-efficient tree of the current selection or page. Use this instead of get_document when exploring large files. Supports detail levels (minimal/compact/full) and dedupe_components for pages heavy with repeated component instances.",
+   "inputSchema": {
+    "properties": {
+     "dedupe_components": {
+      "description": "When true, INSTANCE nodes are serialized compactly (mainComponentId + componentProperties + overrides) and unique component definitions are collected once in a top-level componentDefs map. Highly token-efficient for screens with many repeated component instances.",
+      "type": "boolean"
+     },
+     "depth": {
+      "description": "How many levels deep to traverse (default 2)",
+      "type": "number"
+     },
+     "detail": {
+      "description": "Property verbosity: minimal (id/name/type/bounds only), compact (+fills/strokes/opacity), full (everything, default)",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "search_nodes",
+   "description": "Search for nodes by name substring and/or type within a subtree. Use this when you know (part of) the node name. Use scan_nodes_by_types when you want all nodes of a type regardless of name.",
+   "inputSchema": {
+    "properties": {
+     "limit": {
+      "description": "Maximum results to return (default: 50)",
+      "type": "number"
+     },
+     "nodeId": {
+      "description": "Scope search to this subtree (default: current page), colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "query": {
+      "description": "Name substring to match (case-insensitive)",
+      "type": "string"
+     },
+     "types": {
+      "description": "Filter by Figma node type e.g. ['TEXT', 'FRAME', 'COMPONENT']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "scan_text_nodes",
+   "description": "Scan all TEXT nodes in a subtree and return their content. Shorthand for scan_nodes_by_types with ['TEXT'] \u2014 use when you only need text copy from a component or frame.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Root node ID to scan from, colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "scan_nodes_by_types",
+   "description": "Find all nodes of specific types in a subtree, regardless of name. Use search_nodes instead when you need to filter by name.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Root node ID to scan from, colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "types": {
+      "description": "Node types to find e.g. ['FRAME', 'COMPONENT', 'INSTANCE']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeId",
+     "types"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_reactions",
+   "description": "Get the prototype reactions defined on a node. Returns an array of reaction objects \u2014 each has a trigger (e.g. ON_CLICK, ON_HOVER, AFTER_TIMEOUT) and an actions array (navigate to node, open URL, go back, etc.). Use set_reactions to add or replace reactions, remove_reactions to delete them.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "get_viewport",
+   "description": "Get the current Figma viewport: scroll center, zoom level, and visible bounds.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_fonts",
+   "description": "List all fonts used in the current page, sorted by usage frequency. Useful for understanding typography without scanning all text nodes.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_styles",
+   "description": "Get all local styles in the document (paint, text, effect, and grid). Returns each style's ID, name, type, and properties. Use the style ID with apply_style_to_node or update_paint_style. For design tokens (variables), use get_variable_defs instead.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_variable_defs",
+   "description": "Get all local variable definitions: collections, modes, and values. Variables are Figma's design token system.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_local_components",
+   "description": "Get all components defined in the current Figma file.",
+   "inputSchema": {
+    "properties": {},
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_annotations",
+   "description": "Get dev-mode annotations in the current document or scoped to a specific node. Returns annotation objects with label text, measurement type, and the ID of the annotated node. Omit nodeId to retrieve all annotations on the current page.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Optional \u2014 scope results to annotations on this node and its descendants, colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "export_tokens",
+   "description": "Export all design tokens (variables and paint styles) as JSON or CSS custom properties. Ideal for bridging Figma variables into your codebase.",
+   "inputSchema": {
+    "properties": {
+     "format": {
+      "description": "Output format: json (default) or css",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "get_screenshot",
+   "description": "Export a screenshot of one or more nodes as base64-encoded image data (held in memory).",
+   "inputSchema": {
+    "properties": {
+     "format": {
+      "description": "Export format: PNG (default), SVG, JPG, or PDF",
+      "type": "string"
+     },
+     "nodeIds": {
+      "description": "Optional node IDs to export, colon format. If empty, exports current selection.",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "scale": {
+      "description": "Export scale for raster formats (default 2)",
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "create_frame",
+   "description": "Create a new frame on the current page or inside a parent node.",
+   "inputSchema": {
+    "properties": {
+     "counterAxisAlignItems": {
+      "type": "string"
+     },
+     "counterAxisSizingMode": {
+      "type": "string"
+     },
+     "counterAxisSpacing": {
+      "type": "number"
+     },
+     "fillColor": {
+      "type": "string"
+     },
+     "height": {
+      "type": "number"
+     },
+     "itemSpacing": {
+      "type": "number"
+     },
+     "layoutMode": {
+      "type": "string"
+     },
+     "layoutWrap": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "paddingBottom": {
+      "type": "number"
+     },
+     "paddingLeft": {
+      "type": "number"
+     },
+     "paddingRight": {
+      "type": "number"
+     },
+     "paddingTop": {
+      "type": "number"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "primaryAxisAlignItems": {
+      "type": "string"
+     },
+     "primaryAxisSizingMode": {
+      "type": "string"
+     },
+     "width": {
+      "type": "number"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_rectangle",
+   "description": "Create a new rectangle on the current page or inside a parent node.",
+   "inputSchema": {
+    "properties": {
+     "cornerRadius": {
+      "type": "number"
+     },
+     "fillColor": {
+      "type": "string"
+     },
+     "height": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "width": {
+      "type": "number"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_ellipse",
+   "description": "Create a new ellipse (circle/oval) on the current page or inside a parent node.",
+   "inputSchema": {
+    "properties": {
+     "fillColor": {
+      "type": "string"
+     },
+     "height": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "width": {
+      "type": "number"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_text",
+   "description": "Create a new text node on the current page or inside a parent node. The font is loaded automatically before insertion. Returns the created node ID and bounds. Use set_text to update the content of an existing text node.",
+   "inputSchema": {
+    "properties": {
+     "fillColor": {
+      "type": "string"
+     },
+     "fontFamily": {
+      "type": "string"
+     },
+     "fontSize": {
+      "type": "number"
+     },
+     "fontStyle": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "import_image",
+   "description": "Import a base64-encoded image into Figma as a rectangle with an image fill. Use get_screenshot to capture images or provide your own base64 PNG/JPG.",
+   "inputSchema": {
+    "properties": {
+     "height": {
+      "type": "number"
+     },
+     "imageData": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "scaleMode": {
+      "type": "string"
+     },
+     "width": {
+      "type": "number"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "imageData"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_component",
+   "description": "Convert an existing FRAME node into a reusable COMPONENT. The frame is replaced in place by the new component.",
+   "inputSchema": {
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "FRAME node ID to convert, in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "create_section",
+   "description": "Create a Figma Section node on the current page. Sections are the modern way to organize frames and groups on a page.",
+   "inputSchema": {
+    "properties": {
+     "height": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "width": {
+      "type": "number"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "set_text",
+   "description": "Update the text content of an existing TEXT node.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "TEXT node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "text"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "set_fills",
+   "description": "Set the fill color on a single node (takes one nodeId, not an array). Use mode='append' to stack a new fill on top of existing fills instead of replacing them.",
+   "inputSchema": {
+    "properties": {
+     "color": {
+      "description": "Fill color as hex: #RRGGBB or #RRGGBBAA",
+      "type": "string"
+     },
+     "mode": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "opacity": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeId",
+     "color"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "set_strokes",
+   "description": "Set the stroke color and weight on a single node (takes one nodeId, not an array). Use mode='append' to stack a new stroke on top of existing strokes instead of replacing them.",
+   "inputSchema": {
+    "properties": {
+     "color": {
+      "description": "Stroke color as hex e.g. #000000",
+      "type": "string"
+     },
+     "mode": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "strokeWeight": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeId",
+     "color"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "move_nodes",
+   "description": "Move one or more nodes to an absolute canvas position. The same x/y is applied to every node independently (not a relative offset from current position).",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "resize_nodes",
+   "description": "Resize one or more nodes. The same width/height is applied to every node in the list independently. Provide width, height, or both.",
+   "inputSchema": {
+    "properties": {
+     "height": {
+      "type": "number"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "width": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "rename_node",
+   "description": "Rename a single node by ID. Returns the updated node with its new name. Use batch_rename_nodes to rename multiple nodes at once or to apply find/replace patterns across many nodes.",
+   "inputSchema": {
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "name"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "clone_node",
+   "description": "Clone an existing node, optionally repositioning it or placing it in a new parent.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Source node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "parentId": {
+      "type": "string"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "set_opacity",
+   "description": "Set the opacity of one or more nodes (0 = fully transparent, 1 = fully opaque).",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "opacity": {
+      "description": "Opacity value between 0 and 1",
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "opacity"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_corner_radius",
+   "description": "Set corner radius on one or more nodes. Provide a uniform cornerRadius or individual per-corner values.",
+   "inputSchema": {
+    "properties": {
+     "bottomLeftRadius": {
+      "type": "number"
+     },
+     "bottomRightRadius": {
+      "type": "number"
+     },
+     "cornerRadius": {
+      "type": "number"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "topLeftRadius": {
+      "type": "number"
+     },
+     "topRightRadius": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_auto_layout",
+   "description": "Set or update auto-layout (flex) properties on an existing frame.",
+   "inputSchema": {
+    "properties": {
+     "counterAxisAlignItems": {
+      "type": "string"
+     },
+     "counterAxisSizingMode": {
+      "type": "string"
+     },
+     "counterAxisSpacing": {
+      "type": "number"
+     },
+     "itemSpacing": {
+      "type": "number"
+     },
+     "layoutMode": {
+      "type": "string"
+     },
+     "layoutWrap": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Frame node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "paddingBottom": {
+      "type": "number"
+     },
+     "paddingLeft": {
+      "type": "number"
+     },
+     "paddingRight": {
+      "type": "number"
+     },
+     "paddingTop": {
+      "type": "number"
+     },
+     "primaryAxisAlignItems": {
+      "type": "string"
+     },
+     "primaryAxisSizingMode": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "delete_nodes",
+   "description": "Delete one or more nodes. This cannot be undone via MCP \u2014 use with care.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "Node IDs in colon format e.g. ['4029:12345']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_visible",
+   "description": "Show or hide one or more nodes by setting their visibility.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "visible": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "visible"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "lock_nodes",
+   "description": "Lock one or more nodes to prevent accidental edits in Figma.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "Node IDs in colon format e.g. ['4029:12345']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "unlock_nodes",
+   "description": "Unlock one or more nodes, allowing them to be edited again.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "Node IDs in colon format e.g. ['4029:12345']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "rotate_nodes",
+   "description": "Rotate one or more nodes to an absolute angle in degrees.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "rotation": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "rotation"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "reorder_nodes",
+   "description": "Change the z-order (layer stack position) of one or more nodes.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "order": {
+      "description": "bringToFront | sendToBack | bringForward | sendBackward",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "order"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_blend_mode",
+   "description": "Set the blend mode of one or more nodes (e.g. MULTIPLY, SCREEN, OVERLAY).",
+   "inputSchema": {
+    "properties": {
+     "blendMode": {
+      "type": "string"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "blendMode"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_constraints",
+   "description": "Set layout constraints (pinning behaviour) on one or more nodes relative to their parent.",
+   "inputSchema": {
+    "properties": {
+     "horizontal": {
+      "type": "string"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "vertical": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "reparent_nodes",
+   "description": "Move one or more nodes to a different parent frame, group, or section.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "parentId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeIds",
+     "parentId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "batch_rename_nodes",
+   "description": "Rename multiple nodes using find/replace, regex substitution, or prefix/suffix addition.",
+   "inputSchema": {
+    "properties": {
+     "find": {
+      "type": "string"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "prefix": {
+      "type": "string"
+     },
+     "regexFlags": {
+      "type": "string"
+     },
+     "replace": {
+      "type": "string"
+     },
+     "suffix": {
+      "type": "string"
+     },
+     "useRegex": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "find_replace_text",
+   "description": "Find and replace text content across all TEXT nodes in a subtree. Searches the entire current page if no nodeId is given.",
+   "inputSchema": {
+    "properties": {
+     "find": {
+      "type": "string"
+     },
+     "nodeId": {
+      "type": "string"
+     },
+     "regexFlags": {
+      "type": "string"
+     },
+     "replace": {
+      "type": "string"
+     },
+     "useRegex": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "find",
+     "replace"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleOptional"
+  },
+  {
+   "name": "create_paint_style",
+   "description": "Create a new local paint style with a solid fill color.",
+   "inputSchema": {
+    "properties": {
+     "color": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "color"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_text_style",
+   "description": "Create a new local text style (typography preset). Returns the new style's ID. Apply it to nodes with apply_style_to_node. Use get_styles to list existing text styles.",
+   "inputSchema": {
+    "properties": {
+     "description": {
+      "type": "string"
+     },
+     "fontFamily": {
+      "type": "string"
+     },
+     "fontSize": {
+      "type": "number"
+     },
+     "fontStyle": {
+      "type": "string"
+     },
+     "letterSpacingUnit": {
+      "type": "string"
+     },
+     "letterSpacingValue": {
+      "type": "number"
+     },
+     "lineHeightUnit": {
+      "type": "string"
+     },
+     "lineHeightValue": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "textDecoration": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_effect_style",
+   "description": "Create a new local effect style (drop shadow, inner shadow, or blur).",
+   "inputSchema": {
+    "properties": {
+     "color": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "offsetX": {
+      "type": "number"
+     },
+     "offsetY": {
+      "type": "number"
+     },
+     "opacity": {
+      "type": "number"
+     },
+     "radius": {
+      "type": "number"
+     },
+     "spread": {
+      "type": "number"
+     },
+     "type": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_grid_style",
+   "description": "Create a new local layout grid style.",
+   "inputSchema": {
+    "properties": {
+     "alignment": {
+      "type": "string"
+     },
+     "color": {
+      "type": "string"
+     },
+     "count": {
+      "type": "number"
+     },
+     "description": {
+      "type": "string"
+     },
+     "gutterSize": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "offset": {
+      "type": "number"
+     },
+     "opacity": {
+      "type": "number"
+     },
+     "pattern": {
+      "type": "string"
+     },
+     "sectionSize": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "update_paint_style",
+   "description": "Update an existing paint style's name, color, or description. Only paint styles support in-place updates \u2014 to modify text, effect, or grid styles, use delete_style and recreate them.",
+   "inputSchema": {
+    "properties": {
+     "color": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "styleId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "styleId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "delete_style",
+   "description": "Delete a style (paint, text, effect, or grid) by its ID.",
+   "inputSchema": {
+    "properties": {
+     "styleId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "styleId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "apply_style_to_node",
+   "description": "Apply an existing local style (paint, text, effect, or grid) to a node, linking the node to that style.",
+   "inputSchema": {
+    "properties": {
+     "nodeId": {
+      "description": "Target node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "styleId": {
+      "type": "string"
+     },
+     "target": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "styleId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "set_effects",
+   "description": "Apply one or more effects (drop shadow, inner shadow, layer blur, background blur, or noise) directly to a node. Replaces all existing effects. Pass an empty array to clear all effects. NOISE accepts noiseType (MONOTONE/DUOTONE/MULTITONE), noiseSize, density, color, plus secondaryColor for DUOTONE or opacity for MULTITONE \u2014 NoiseEffect is marked beta by Figma and may change.",
+   "inputSchema": {
+    "properties": {
+     "effects": {
+      "items": {
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "nodeId": {
+      "description": "Target node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "effects"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "bind_variable_to_node",
+   "description": "Bind a local variable to a node property so the property is driven by the variable's value. COLOR variables: use fillColor or strokeColor. BOOLEAN variables: use visible. FLOAT variables: use opacity, rotation, width, height, cornerRadius, topLeftRadius, topRightRadius, bottomLeftRadius, bottomRightRadius, strokeWeight, itemSpacing, paddingTop, paddingRight, paddingBottom, paddingLeft.",
+   "inputSchema": {
+    "properties": {
+     "field": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Target node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "variableId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "variableId",
+     "field"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "create_variable_collection",
+   "description": "Create a new local variable collection with an optional initial mode name. NOTE \u2014 Figma free plan limits each collection to 1 mode. If you need Light/Dark (or any multi-mode) theming and the user is on the free plan, do NOT try to call add_variable_mode; instead use the name-prefix workaround: create all variables in a single collection and prefix each variable name with its mode, e.g. 'light/color-bg' and 'dark/color-bg'. Inform the user of this limitation.",
+   "inputSchema": {
+    "properties": {
+     "initialModeName": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "add_variable_mode",
+   "description": "Add a new mode to an existing variable collection (e.g. Light/Dark, Desktop/Mobile). IMPORTANT \u2014 Figma free plan only allows 1 mode per collection; calling this tool on a free-plan account will return the error 'Limited to 1 modes only'. If that error occurs, stop retrying and switch to the name-prefix workaround: keep the single default mode and create variables prefixed by mode, e.g. 'light/color-bg' and 'dark/color-bg' in the same collection. Tell the user that native multi-mode variables require a paid Figma plan (Professional or above).",
+   "inputSchema": {
+    "properties": {
+     "collectionId": {
+      "type": "string"
+     },
+     "modeName": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "collectionId",
+     "modeName"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "create_variable",
+   "description": "Create a new variable (design token) inside an existing collection. Returns the new variable's ID. Use get_variable_defs to find collection IDs, set_variable_value to set values per mode, and bind_variable_to_node to apply the variable to a node property.",
+   "inputSchema": {
+    "properties": {
+     "collectionId": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "type": {
+      "description": "COLOR | FLOAT | STRING | BOOLEAN",
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "collectionId",
+     "type"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "set_variable_value",
+   "description": "Set a variable's value for a specific mode.",
+   "inputSchema": {
+    "properties": {
+     "modeId": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "variableId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "variableId",
+     "modeId",
+     "value"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "delete_variable",
+   "description": "Delete a single variable (provide variableId) or an entire collection and all its variables (provide collectionId). Provide exactly one of the two \u2014 not both.",
+   "inputSchema": {
+    "properties": {
+     "collectionId": {
+      "type": "string"
+     },
+     "variableId": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "add_page",
+   "description": "Add a new page to the Figma document.",
+   "inputSchema": {
+    "properties": {
+     "index": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "delete_page",
+   "description": "Delete a page from the Figma document. Cannot delete the only remaining page.",
+   "inputSchema": {
+    "properties": {
+     "pageId": {
+      "type": "string"
+     },
+     "pageName": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "rename_page",
+   "description": "Rename an existing page in the Figma document.",
+   "inputSchema": {
+    "properties": {
+     "newName": {
+      "type": "string"
+     },
+     "pageId": {
+      "type": "string"
+     },
+     "pageName": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "newName"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "navigate_to_page",
+   "description": "Switch the active Figma page. Provide either pageId or pageName.",
+   "inputSchema": {
+    "properties": {
+     "pageId": {
+      "type": "string"
+     },
+     "pageName": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   },
+   "nodeIds": "None"
+  },
+  {
+   "name": "group_nodes",
+   "description": "Group two or more nodes into a GROUP. All nodes must share the same parent.",
+   "inputSchema": {
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "nodeIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "ungroup_nodes",
+   "description": "Ungroup one or more GROUP nodes, moving their children to the parent and removing the group.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "Node IDs in colon format e.g. ['4029:12345']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "swap_component",
+   "description": "Swap the main component of an existing INSTANCE node, replacing it with a different component while keeping position and size.",
+   "inputSchema": {
+    "properties": {
+     "componentId": {
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "INSTANCE node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId",
+     "componentId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "detach_instance",
+   "description": "Detach one or more component instances, converting them to plain frames. The link to the main component is broken; all visual properties are preserved.",
+   "inputSchema": {
+    "properties": {
+     "nodeIds": {
+      "description": "Node IDs in colon format e.g. ['4029:12345']",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeIds"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "Multi"
+  },
+  {
+   "name": "set_reactions",
+   "description": "Set prototype reactions on a node. Use mode \"replace\" (default) to overwrite all reactions, or \"append\" to add to existing ones.\n\nSupported triggers: ON_CLICK, ON_HOVER, ON_PRESS, ON_DRAG, AFTER_TIMEOUT, MOUSE_ENTER, MOUSE_LEAVE, MOUSE_UP, MOUSE_DOWN\nSupported action types: NODE (navigation), BACK, CLOSE, URL\n  NODE navigation values: NAVIGATE, OVERLAY, SCROLL_TO, SWAP, CHANGE_TO\nTransition types: DISSOLVE, SMART_ANIMATE, MOVE_IN, MOVE_OUT, PUSH, SLIDE_IN, SLIDE_OUT",
+   "inputSchema": {
+    "properties": {
+     "mode": {
+      "description": "'replace' (default) or 'append'",
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     },
+     "reactions": {
+      "items": {
+       "type": "object"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "nodeId",
+     "reactions"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  },
+  {
+   "name": "remove_reactions",
+   "description": "Remove prototype reactions from a node. Omit indices to remove all reactions. Provide a zero-based indices array to remove specific reactions (use get_reactions first to see current indices).",
+   "inputSchema": {
+    "properties": {
+     "indices": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "nodeId": {
+      "description": "Node ID in colon format e.g. '4029:12345'",
+      "type": "string"
+     }
+    },
+    "required": [
+     "nodeId"
+    ],
+    "type": "object"
+   },
+   "nodeIds": "SingleField"
+  }
+ ],
+ "prompts": [
+  {
+   "name": "read_design_strategy",
+   "description": "Best practices for reading Figma designs with figma-remote-mcp",
+   "body": "To effectively read a Figma design with figma-mcp-rust:\n\n1. Start with get_metadata to understand file name, pages, and current page\n2. Use get_pages to list all pages without loading their full trees\n3. Use get_design_context (depth=2, detail=compact) for a token-efficient summary of the current selection or page\n   - detail=minimal: id/name/type/bounds only (~5% tokens)\n   - detail=compact: + fills/strokes/opacity (~30% tokens)\n   - detail=full: everything, default (100% tokens)\n   - dedupe_components=true: INSTANCE nodes are collapsed to compact stubs (mainComponentId + componentProperties overrides);\n     unique component structures are collected once in a top-level componentDefs map.\n     Use this whenever the screen contains repeated component instances (e.g. card lists, table rows, nav items).\n     Typical savings: 5-10x fewer tokens vs full serialization of repeated instances.\n4. For screens with many repeated components, the recommended reading flow is:\n   a. get_design_context(depth=2, detail=minimal, dedupe_components=true) to see the instance layout and component IDs\n   b. Inspect componentDefs in the response: one definition per unique component, not one per instance\n   c. Read componentProperties on each instance stub for variant selections, text overrides, and boolean toggles\n   d. Drill into specific instances with get_node only when an instance has unique overrides you need to inspect\n5. Use search_nodes to find nodes by name or type without dumping the entire tree\n6. Drill into specific nodes with get_node or get_nodes_info (prefer batch over single calls)\n7. For text-heavy components, use scan_text_nodes to collect all copy at once\n8. Use scan_nodes_by_types to find all FRAME/COMPONENT/INSTANCE nodes in a subtree\n9. Call get_styles and get_variable_defs once per session to understand the design system\n10. Call get_fonts to understand typography usage across the page at a glance\n11. Use get_viewport to see what the user is currently looking at in the canvas\n12. Use get_reactions to inspect prototype interactions on a node\n13. Call get_screenshot last and only when visual confirmation is needed, because it is expensive\n14. Node IDs use colon format (4029:12345), never hyphens\n15. get_local_components returns componentSets and variantProperties for variant-aware inspection\n"
+  },
+  {
+   "name": "design_strategy",
+   "description": "Best practices for working with Figma designs",
+   "body": "When working with Figma designs, follow these best practices:\n\n1. Start with Document Structure:\n   - First use get_metadata() to understand the current document\n   - Use get_pages() to list all pages\n   - Plan your layout hierarchy before creating elements\n   - Create a main container frame for each screen/section\n\n2. Naming Conventions:\n   - Use descriptive, semantic names for all elements\n   - Follow a consistent naming pattern (e.g., \"Login Screen\", \"Logo Container\", \"Email Input\")\n   - Group related elements with meaningful names\n\n3. Layout Hierarchy:\n   - Create parent frames first, then add child elements\n   - For forms/login screens:\n     * Start with the main screen container frame\n     * Create a logo container at the top\n     * Group input fields in their own containers\n     * Place action buttons (login, submit) after inputs\n     * Add secondary elements (forgot password, signup links) last\n\n4. Input Fields Structure:\n   - Create a container frame for each input field\n   - Include a label text above or inside the input\n   - Group related inputs (e.g., username/password) together\n\n5. Element Creation:\n   - Use create_frame() for containers and input fields\n   - Use create_text() for labels, buttons text, and links\n   - Set appropriate colors and styles:\n     * Use fillColor for backgrounds\n     * Use set_strokes() for borders\n     * Set proper fontStyle for different text elements\n\n6. Modifying existing elements:\n   - Use set_text() to modify text content of a TEXT node\n   - Use set_fills() to change background/fill colors\n   - Use move_nodes() / resize_nodes() for position and size adjustments\n\n7. Visual Hierarchy:\n   - Position elements in logical reading order (top to bottom)\n   - Maintain consistent spacing between elements\n   - Use appropriate font sizes for different text types:\n     * Larger for headings/welcome text\n     * Medium for input labels\n     * Standard for button text\n     * Smaller for helper text/links\n\n8. Best Practices:\n   - Verify each creation with get_node()\n   - Use parentId to maintain proper hierarchy\n   - Group related elements together in frames\n   - Keep consistent spacing and alignment\n   - All write operations are undoable via Ctrl/Cmd+Z in Figma\n\nExample Login Screen Structure:\n- Login Screen (main frame)\n  - Logo Container (frame)\n    - Logo (text)\n  - Welcome Text (text)\n  - Input Container (frame)\n    - Email Input (frame)\n      - Email Label (text)\n      - Email Field (frame)\n    - Password Input (frame)\n      - Password Label (text)\n      - Password Field (frame)\n  - Login Button (frame)\n    - Button Text (text)\n  - Helper Links (frame)\n    - Forgot Password (text)\n    - Don't have account (text)\n"
+  },
+  {
+   "name": "text_replacement_strategy",
+   "description": "Systematic approach for replacing text in Figma designs",
+   "body": "# Intelligent Text Replacement Strategy\n\n## 1. Analyze Design & Identify Structure\n- Scan text nodes to understand the overall structure of the design\n- Use AI pattern recognition to identify logical groupings:\n  * Tables (rows, columns, headers, cells)\n  * Lists (items, headers, nested lists)\n  * Card groups (similar cards with recurring text fields)\n  * Forms (labels, input fields, validation text)\n  * Navigation (menu items, breadcrumbs)\n\nscan_text_nodes(nodeId: \"node-id\")\nget_node(nodeId: \"node-id\")  // optional for extra context\n\n## 2. Strategic Chunking for Complex Designs\n- Divide replacement tasks into logical content chunks based on design structure\n- Use one of these chunking strategies that best fits the design:\n  * Structural Chunking: Table rows/columns, list sections, card groups\n  * Spatial Chunking: Top-to-bottom, left-to-right in screen areas\n  * Semantic Chunking: Content related to the same topic or functionality\n  * Component-Based Chunking: Process similar component instances together\n\n## 3. Progressive Replacement with Verification\n- Create a safe copy of the node before bulk replacements\n- Replace text chunk by chunk with continuous progress updates\n- After each chunk is processed:\n  * Export that section with get_screenshot for visual verification\n  * Verify text fits properly and maintains design integrity\n  * Fix issues before proceeding to the next chunk\n\n// Clone the node to create a safe copy\nclone_node(nodeId: \"selected-node-id\", x: newX, y: newY)\n\n// Replace text one node at a time or in batches\nset_text(nodeId: \"node-id\", text: \"New text\")\n\n// Verify chunk with targeted image export\nget_screenshot(nodeIds: [\"chunk-node-id\"], format: \"PNG\", scale: 0.5)\n\n## 4. Intelligent Handling for Table Data\n- For tabular content:\n  * Process one row or column at a time\n  * Maintain alignment and spacing between cells\n  * Consider conditional formatting based on cell content\n  * Preserve header/data relationships\n\n## 5. Smart Text Adaptation\n- Adaptively handle text based on container constraints:\n  * Auto-detect space constraints and adjust text length\n  * Apply line breaks at appropriate linguistic points\n  * Maintain text hierarchy and emphasis\n\n## 6. Final Verification & Context-Aware QA\n- After all chunks are processed:\n  * Export the entire design at reduced scale for final verification\n  * Check for cross-chunk consistency issues\n  * Verify proper text flow between different sections\n  * Ensure design harmony across the full composition\n\n## 7. Chunk-Specific Export Scale Guidelines\n- Scale exports appropriately based on chunk size:\n  * Small chunks (1-5 elements): scale 1.0\n  * Medium chunks (6-20 elements): scale 0.7\n  * Large chunks (21-50 elements): scale 0.5\n  * Very large chunks (50+ elements): scale 0.3\n  * Full design verification: scale 0.2\n\n## Best Practices\n- Preserve Design Intent: Always prioritize design integrity\n- Structural Consistency: Maintain alignment, spacing, and hierarchy\n- Visual Feedback: Verify each chunk visually before proceeding\n- Incremental Improvement: Learn from each chunk to improve subsequent ones\n- Respect Content Relationships: Keep related content consistent across chunks\n"
+  },
+  {
+   "name": "annotation_conversion_strategy",
+   "description": "Strategy for converting manual annotations to Figma's native annotations",
+   "body": "# Automatic Annotation Conversion\n\n## Process Overview\nConvert manual annotations (numbered/alphabetical indicators with connected descriptions) to Figma's native annotations:\n\n1. Get selected frame/component information\n2. Scan and collect all annotation text nodes\n3. Scan target UI elements (components, instances, frames)\n4. Match annotations to appropriate UI elements\n5. Apply native Figma annotations\n\n## Step 1: Get Selection and Initial Setup\n\n// Get the selected frame/component\nget_selection()\n// Note the selected node ID, then:\nget_annotations(nodeId: \"selected-node-id\")\n\n## Step 2: Scan Annotation Text Nodes\n\n// Get all text nodes in the selection\nscan_text_nodes(nodeId: \"selected-node-id\")\n\n// Filter and group annotation markers and descriptions\n// Markers typically have these characteristics:\n// - Short text content (usually single digit/letter)\n// - Specific font styles (often bold)\n// - Located in a container with \"Marker\" or \"Dot\" in the name\n// - Have a clear naming pattern (e.g., \"1\", \"2\", \"3\" or \"A\", \"B\", \"C\")\n\n## Step 3: Scan Target UI Elements\n\n// Get all potential target elements that annotations might refer to\nscan_nodes_by_types(nodeId: \"selected-node-id\", types: [\"COMPONENT\", \"INSTANCE\", \"FRAME\"])\n\n## Step 4: Match Annotations to Targets\n\nMatch each annotation to its target UI element using these strategies in order of priority:\n\n1. Path-Based Matching:\n   - Look at the marker's parent container name in the Figma layer hierarchy\n   - Remove any \"Marker:\" or \"Annotation:\" prefixes from the parent name\n   - Find UI elements that share the same parent name or have it in their path\n\n2. Name-Based Matching:\n   - Extract key terms from the annotation description\n   - Look for UI elements whose names contain these key terms\n   - Particularly effective for form fields, buttons, and labeled components\n\n3. Proximity-Based Matching (fallback):\n   - Calculate the center point of the marker using its bounds\n   - Find the closest UI element by measuring distances to element centers\n   - Use this method when other matching strategies fail\n\n## Step 5: Verify Results\n\nAfter converting annotations, verify with:\nget_annotations(nodeId: \"selected-node-id\")\nget_screenshot(nodeIds: [\"selected-node-id\"], format: \"PNG\", scale: 0.5)\n\nThis strategy focuses on practical implementation based on real-world usage patterns,\nemphasizing the importance of handling various UI elements as annotation targets.\n"
+  },
+  {
+   "name": "swap_overrides_instances",
+   "description": "Strategy for transferring overrides between component instances in Figma",
+   "body": "# Swap Component Instance and Override Strategy\n\n## Overview\nTransfer content and property overrides from a source instance to one or more target instances\nin Figma, maintaining design consistency while reducing manual work.\n\n## Step-by-Step Process\n\n### 1. Selection Analysis\n- Use get_selection() to identify the parent component or selected instances\n- For parent components, scan for instances with:\n  scan_nodes_by_types(nodeId: \"parent-id\", types: [\"INSTANCE\"])\n- Identify custom slots by name patterns (e.g. \"Custom Slot*\" or \"Instance Slot\")\n- Determine which is the source instance (with content to copy) and which are targets\n\n### 2. Inspect Source Instance\n- Use get_node(nodeId: \"source-instance-id\") to examine the source instance structure\n- Use get_nodes_info(nodeIds: [...]) to batch-inspect multiple instances\n- Use scan_text_nodes(nodeId: \"source-instance-id\") to capture all text content\n\n### 3. Apply Overrides to Targets\n- For text overrides: use set_text(nodeId: \"target-text-node-id\", text: \"copied text\")\n- For fill overrides: use set_fills(nodeId: \"target-node-id\", color: \"#hexcolor\")\n- For stroke overrides: use set_strokes(nodeId: \"target-node-id\", color: \"#hexcolor\")\n- Process targets one at a time or identify patterns to apply systematically\n\n### 4. Verification\n- Verify results with get_node() or get_design_context()\n- Confirm text content and style overrides have transferred successfully\n- Use get_screenshot() for visual confirmation if needed\n\n## Key Tips\n- Use scan_nodes_by_types to enumerate all instances before starting\n- When working with multiple targets, check the full selection with get_selection()\n- Prefer reading the full node tree of the source first to understand its structure\n- Keep related content consistent across all target instances\n"
+  },
+  {
+   "name": "reaction_to_connector_strategy",
+   "description": "Strategy for analyzing Figma prototype reactions and mapping interaction flows",
+   "body": "# Analyze Figma Prototype Reactions and Map Interaction Flows\n\n## Goal\nProcess the JSON output from the get_reactions tool to understand prototype flows\nand produce a clear, structured map of interactions between screens/nodes.\n\n## Input Data\nYou will receive JSON data from get_reactions. Each node may contain reactions like:\n{\n  \"trigger\": { \"type\": \"ON_CLICK\" },\n  \"action\": {\n    \"type\": \"NAVIGATE\",\n    \"destinationId\": \"destination-node-id\"\n  }\n}\n\n## Step-by-Step Process\n\n### 1. Gather Context\n- Call get_nodes_info(nodeIds: [...]) on all relevant nodes to get their names and types\n- Call get_design_context(depth: 2, detail: \"minimal\") to understand the page structure\n\n### 2. Filter and Transform Reactions\n- Iterate through the get_reactions JSON output\n- Keep only reactions where action type implies navigation:\n  * NAVIGATE, OPEN_OVERLAY, SWAP_OVERLAY\n  * Ignore: CHANGE_TO, CLOSE_OVERLAY, and others without a destinationId\n- Extract per reaction:\n  * sourceNodeId: the node the reaction belongs to\n  * destinationId: action.destinationId\n  * actionType: action.type\n  * triggerType: trigger.type\n\n### 3. Generate Flow Map\nFor each valid reaction, create a human-readable description:\n- \"On click, navigate to [Destination Name]\"\n- \"On drag, open [Destination Name] overlay\"\n- \"On hover, swap to [Destination Name]\"\n\nCombine these into a structured flow map grouped by source screen.\n\n### 4. Output Format\nProduce a summary like:\n\nFlow Map:\n- [Screen A] --ON_CLICK/NAVIGATE--> [Screen B]\n- [Screen A] --ON_CLICK/OPEN_OVERLAY--> [Modal C]\n- [Screen B] --ON_CLICK/NAVIGATE--> [Screen C]\n\n### 5. Verification\n- Use get_screenshot(nodeIds: [...]) on key screens to visually confirm the flow\n- Cross-check node names from get_nodes_info with the flow map\n\n## Notes\n- Node IDs use colon format (4029:12345), never hyphens\n- Use get_reactions on a set of nodes that represent screens or interactive frames\n- Focus on NAVIGATE actions for the primary user journey\n"
+  },
+  {
+   "name": "style_audit_strategy",
+   "description": "Audit a design for nodes using raw values instead of linked styles or variables",
+   "body": "# Style Audit Strategy\n\nFind all nodes that use raw (unlinked) fill colors, text styles, or effect styles instead of the\ndesign system's named styles or variables. Report findings and optionally fix them.\n\n## Steps\n\n1. **Collect the design system**\n   - Call get_styles() to list all local paint, text, effect, and grid styles (note their names and IDs).\n   - Call get_variable_defs() to list all local COLOR variables (note their names and IDs).\n\n2. **Scan the design**\n   - Call get_design_context() with detail=\"compact\" to get the full node tree.\n   - For each node that has a fills, strokes, or textStyle property:\n     - If the node's style field shows a named style (e.g. \"fillStyle\": \"Brand/Primary\"), it is already linked; skip it.\n     - If the node shows a raw fill color (e.g. \"fills\": [{\"type\":\"SOLID\",\"color\":...}]) without a style name, flag it.\n     - If a TEXT node shows raw fontFamily/fontSize without a textStyle name, flag it.\n\n3. **Match raw values to existing styles**\n   - For each flagged node, check whether the raw hex color matches any existing paint style color.\n   - If a match is found, recommend apply_style_to_node() to link the node to that style.\n   - If no match is found, note the raw value as a design system gap (a new style may be needed).\n\n4. **Report findings**\n   Present a table:\n   | Node ID | Node Name | Issue | Raw Value | Matching Style |\n   |---------|-----------|-------|-----------|----------------|\n\n5. **Fix (optional, ask user first)**\n   For each node with a matching style, call:\n     apply_style_to_node(nodeId, styleId, target)\n   Batch nodes by styleId to minimize round trips.\n\n## Rules\n- Never change a node's visual appearance; only link it to a style that already matches.\n- Skip INSTANCE nodes whose overrides intentionally diverge from the main component.\n- Process in chunks of 20 nodes at a time when scanning large trees.\n"
+  },
+  {
+   "name": "bulk_rename_strategy",
+   "description": "Rename nodes across a design following a naming convention",
+   "body": "# Bulk Rename Strategy\n\nSystematically rename nodes to follow a consistent naming convention without moving or\nmodifying any visual properties.\n\n## Naming Convention (BEM-style, adapt as needed)\n\n- Screens / pages:         \"ScreenName\" (PascalCase)\n- Section frames:          \"Section/Name\"\n- Component instances:     \"ComponentName\" (match main component name)\n- Containers:              \"ComponentName/Container\"\n- Content groups:          \"ComponentName/Content\"\n- Interactive elements:    \"ComponentName/ActionName\" (e.g. \"Card/CTAButton\")\n- Text nodes:              \"Label\", \"Title\", \"Body\", \"Caption\"\n- Icon wrappers:           \"Icon/IconName\"\n- Auto-generated Figma names to avoid: \"Frame 123\", \"Rectangle 45\", \"Group 6\"\n\n## Steps\n\n1. **Understand the scope**\n   Ask the user: rename the entire page, a specific frame, or just selected nodes?\n   - Entire page: use get_document() to get the root node ID, then scan_nodes_by_types().\n   - Specific frame: use get_node(nodeId) to inspect it first.\n   - Selection: use get_selection().\n\n2. **Scan target nodes**\n   Call scan_nodes_by_types(nodeId, types=[\"FRAME\",\"GROUP\",\"INSTANCE\",\"TEXT\",\"RECTANGLE\",\"ELLIPSE\",\"VECTOR\"])\n   to get a flat list of all nodes in scope.\n\n3. **Identify nodes needing rename**\n   Flag nodes whose names match Figma's auto-generated patterns:\n   - \"Frame \\d+\", \"Rectangle \\d+\", \"Group \\d+\", \"Ellipse \\d+\", \"Vector \\d+\", \"Component \\d+\"\n   - Any name the user considers non-descriptive.\n\n4. **Propose names**\n   For each flagged node, derive a new name from:\n   - Its node type and content (TEXT nodes: use their text content as label).\n   - Its position in the hierarchy (child of \"Card\" frame: \"Card/...\").\n   - Its visual role (if it contains only an icon: \"Icon/...\").\n   - For INSTANCE nodes: use the mainComponent name.\n   Show a preview table to the user before applying:\n   | Node ID | Current Name | Proposed Name |\n\n5. **Apply renames (after user confirmation)**\n   Call rename_node(nodeId, name) for each node.\n   Process in batches; do not wait for user confirmation between individual renames once\n   the full plan is approved.\n\n## Rules\n- Never rename nodes that already follow the convention.\n- Never change names of COMPONENT master nodes (only instances and frames).\n- Preserve \"/\" hierarchy separators; do not flatten them.\n- If unsure about a name, leave it and flag it for the user to decide.\n"
+  },
+  {
+   "name": "design_token_generation_strategy",
+   "description": "Extract raw values from an existing design and build a structured variable + style token system",
+   "body": "# Design Token Generation Strategy\n\nScan an existing design to discover all unique colors, font sizes, spacing values, and radii,\nthen create a structured variable collection and named styles, and finally link nodes to them.\n\n## Steps\n\n### Phase 1: Discovery\n\n1. Call get_styles() to check what styles already exist (avoid duplicating them).\n2. Call get_variable_defs() to check existing variables.\n3. Call get_design_context(detail=\"compact\") to scan the full node tree.\n4. Collect unique values:\n   - **Colors**: all unique hex fills and stroke colors across nodes.\n   - **Font sizes**: all unique fontSize values on TEXT nodes.\n   - **Spacing**: all unique itemSpacing, paddingTop/Right/Bottom/Left values on FRAME nodes.\n   - **Radii**: all unique cornerRadius values.\n\n### Phase 2: Token naming\n\nMap discovered values to semantic token names. Use this hierarchy:\n\n**Colors** (variable collection \"Primitives\"):\n- Sort colors by hue/lightness.\n- Assign names like \"Blue/100\", \"Blue/200\", ... \"Blue/900\", \"Neutral/50\", \"Neutral/900\", etc.\n- Also create a \"Semantic\" collection with aliases: \"Color/Primary\", \"Color/Background\", \"Color/Text\", etc.\n\n**Spacing** (variable collection \"Spacing\"):\n- Name by scale: \"Spacing/0\" (0), \"Spacing/1\" (4px), \"Spacing/2\" (8px), \"Spacing/3\" (12px), ...\n\n**Radius** (variable collection \"Radius\"):\n- Name: \"Radius/None\" (0), \"Radius/SM\" (4), \"Radius/MD\" (8), \"Radius/LG\" (16), \"Radius/Full\" (9999)\n\n**Typography** (local text styles):\n- Name: \"Heading/H1\", \"Heading/H2\", \"Body/Regular\", \"Body/Small\", \"Label/Medium\", etc.\n\nPresent the full token plan to the user for approval before creating anything.\n\n### Phase 3: Creation\n\nFor each approved token:\n- COLOR variables: create_variable_collection(), then create_variable(type=\"COLOR\"), then set_variable_value()\n- FLOAT variables: create_variable_collection(), then create_variable(type=\"FLOAT\"), then set_variable_value()\n- Text styles: create_text_style() with name, fontFamily, fontSize, lineHeight, letterSpacing\n- Paint styles: create_paint_style() with name, color\n\n### Phase 4: Linking (optional, ask user)\n\nAfter creating tokens, offer to link existing nodes:\n- For nodes with raw fill colors that match a new variable: bind_variable_to_node(field=\"fillColor\")\n- For TEXT nodes with matching font styles: apply_style_to_node(styleId)\n\n## Multi-mode / Theming (Light & Dark)\n\n### Paid plan (Professional / Organization / Enterprise)\nUse Figma's native multi-mode variables:\n1. create_variable_collection() creates the collection with one default mode (e.g. \"Light\").\n2. add_variable_mode() adds the second mode (e.g. \"Dark\").\n3. create_variable() creates each variable once; it exists in all modes automatically.\n4. set_variable_value() is called once per mode: first the Light value, then the Dark value.\n\n### Free plan workaround (when add_variable_mode returns \"Limited to 1 modes only\")\nFigma's free plan is capped at 1 mode per collection. Detect this error and fall back to\nname-encoded modes: keep a **single collection with 1 mode**, and prefix every variable name\nwith the mode it belongs to.\n\nNaming convention: use a slash-prefix per mode:\n- light/color-bg, dark/color-bg\n- light/color-text, dark/color-text\n- light/color-primary, dark/color-primary\n\nSteps:\n1. create_variable_collection(): one collection, accept the single default mode as-is.\n2. create_variable(name=\"light/<token>\") for the Light variant.\n3. create_variable(name=\"dark/<token>\") for the Dark variant.\n4. set_variable_value() for each variable.\n\nBind the active-theme variable to nodes (e.g. bind the \"light/color-bg\" variable for light theme).\nWhen the user wants to switch to dark, rebind nodes to the corresponding \"dark/*\" variable.\nInform the user that native mode-switching requires a paid Figma plan; with this workaround\nthey manually choose which prefixed variable to bind.\n\n## Rules\n- Never delete or overwrite existing styles/variables; only add new ones.\n- Prefer variables over paint styles for colors that will need dark-mode variants.\n- Always get user approval on the token plan (Phase 2) before executing Phase 3.\n- Process in batches of 20 during linking phase.\n- Detect the free-plan mode limit at runtime: if add_variable_mode fails with \"Limited to 1 modes only\", switch to the name-encoded workaround automatically and inform the user.\n"
+  },
+  {
+   "name": "generate_color_palette",
+   "description": "Generate a complete semantic color palette (primitive scale + semantic aliases) from one or more brand colors",
+   "body": "# Generate Color Palette\n\nGiven one or more brand colors, generate a full design-system color palette with a primitive\nscale and semantic aliases, then create them as Figma variables.\n\n## Input\n\nAsk the user for:\n- Primary brand color (hex), required\n- Secondary/accent color (hex), optional\n- Whether to include neutral/gray scale, default yes\n- Whether to generate dark mode, default yes\n\n## Color Scale Algorithm\n\nFor each brand color, generate a 9-step scale (50, 100, 200, 300, 400, 500, 600, 700, 800, 900)\nby varying lightness in HSL space:\n- 50: lightest tint (~95% lightness)\n- 100: ~90% lightness\n- 200: ~80% lightness\n- 300: ~70% lightness\n- 400: ~60% lightness\n- 500: base color (the input hex)\n- 600: ~45% lightness\n- 700: ~35% lightness\n- 800: ~25% lightness\n- 900: darkest shade (~15% lightness)\n\nFor neutrals: use the primary hue but desaturate to 5-10% saturation.\n\nShow the full color table to the user for review before creating anything.\n\n## Semantic Aliases\n\nAfter the primitive scale, create semantic tokens that reference primitives:\n\nLight mode:\n- Color/Background/Default:  Neutral/50\n- Color/Background/Subtle:   Neutral/100\n- Color/Text/Default:        Neutral/900\n- Color/Text/Subtle:         Neutral/600\n- Color/Text/Disabled:       Neutral/400\n- Color/Primary/Default:     Primary/500\n- Color/Primary/Hover:       Primary/600\n- Color/Primary/Active:      Primary/700\n- Color/Primary/Subtle:      Primary/100\n- Color/Border/Default:      Neutral/200\n- Color/Border/Focus:        Primary/500\n\nDark mode (add a \"Dark\" mode to the same collection):\n- Color/Background/Default:  Neutral/900\n- Color/Background/Subtle:   Neutral/800\n- Color/Text/Default:        Neutral/50\n- Color/Text/Subtle:         Neutral/300\n- Color/Primary/Default:     Primary/400\n- (etc.)\n\n## Creation Steps\n\n1. create_variable_collection(name=\"Primitives\", modeName=\"Value\")\n2. For each color in the scale: create_variable(type=\"COLOR\", name=\"Primary/500\", collectionId=...)\n   then set_variable_value(variableId, modeId, value=\"#hexcolor\")\n3. Repeat for secondary and neutrals.\n4. create_variable_collection(name=\"Semantic Colors\", modeName=\"Light\")\n5. add_variable_mode(collectionId, modeName=\"Dark\") if dark mode is requested\n6. For each semantic alias: create_variable + set_variable_value for Light mode, then Dark mode.\n\n## Rules\n- Always show the color table preview before executing creation.\n- Create Primitives collection first, Semantic collection second.\n- Use only hex values for variable colors.\n- Semantic variable values reference other variables conceptually; set the actual resolved hex value\n  since variable aliasing (variable-to-variable binding) is not yet supported via MCP.\n"
+  },
+  {
+   "name": "generate_type_scale",
+   "description": "Generate a complete typography scale (text styles) from a base font and size",
+   "body": "# Generate Type Scale\n\nGiven a base font family and body size, generate a full typographic scale as Figma text styles.\n\n## Input\n\nAsk the user for:\n- Font family (e.g. \"Inter\"), required\n- Base body font size in px (e.g. 16), required\n- Scale ratio: \"minor-third\" (1.2), \"major-third\" (1.25), \"perfect-fourth\" (1.333), \"golden\" (1.618), default major-third\n- Include display sizes (above H1)? Default no\n- Include mono / code style? Default no\n\n## Scale Calculation\n\nUsing base size B and ratio R:\n\n| Style Name       | Size formula    | Weight | Line Height | Letter Spacing |\n|------------------|-----------------|--------|-------------|----------------|\n| Display/2XL      | B x R^7 (px)    | 700    | 1.1         | -0.02em        |\n| Display/XL       | B x R^6         | 700    | 1.1         | -0.02em        |\n| Heading/H1       | B x R^5         | 700    | 1.2         | -0.01em        |\n| Heading/H2       | B x R^4         | 700    | 1.25        | -0.01em        |\n| Heading/H3       | B x R^3         | 600    | 1.3         | 0              |\n| Heading/H4       | B x R^2         | 600    | 1.35        | 0              |\n| Body/XL          | B x R^1         | 400    | 1.6         | 0              |\n| Body/Base        | B               | 400    | 1.6         | 0              |\n| Body/SM          | B / R           | 400    | 1.5         | 0              |\n| Label/LG         | B x R^0.5 (px)  | 500    | 1.4         | +0.01em        |\n| Label/Base       | B               | 500    | 1.4         | +0.01em        |\n| Label/SM         | B / R           | 500    | 1.4         | +0.02em        |\n| Caption/Base     | B / R^1.5 (px)  | 400    | 1.4         | +0.02em        |\n| Code/Base        | B               | 400    | 1.6         | 0 (mono font)  |\n\nRound all sizes to nearest integer. Minimum size: 10px.\n\nShow the full table to the user for review before creating anything.\n\n## Creation Steps\n\n1. For each style row, call create_text_style() with:\n   - name: e.g. \"Heading/H1\"\n   - fontFamily: the chosen font\n   - fontStyle: map weight to style name (\"Regular\"=400, \"Medium\"=500, \"SemiBold\"=600, \"Bold\"=700)\n   - fontSize: calculated value\n   - lineHeightValue + lineHeightUnit=\"PIXELS\" (convert ratio x size to px)\n   - letterSpacingValue + letterSpacingUnit=\"PERCENT\" (convert em to %)\n\n2. Skip styles already present with the same name (create_text_style is idempotent).\n\n## Rules\n- Always show the scale preview table before executing.\n- Use \"Regular\" font style for weight 400, \"Medium\" for 500, \"SemiBold\" for 600, \"Bold\" for 700.\n  Adjust if the chosen font uses different style names (ask user to confirm).\n- Line height in PIXELS = round(fontSize x lineHeightRatio).\n- Letter spacing in PERCENT = letterSpacingEm x 100.\n"
+  },
+  {
+   "name": "generate_component_variants",
+   "description": "Generate design variants of an existing component or frame (size, color, state, theme)",
+   "body": "# Generate Component Variants\n\nGiven an existing frame or component, produce a set of visual variants (e.g. sizes, color themes,\nstates) by cloning and mutating it. Arrange the variants in a tidy grid for review.\n\n## Input\n\nAsk the user:\n- Source node ID (the base component or frame to clone)\n- What variants to generate, one or more of:\n  a) **Sizes**: Small, Medium, Large (scale width/height, adjust font size and padding)\n  b) **Color themes**: e.g. Primary, Secondary, Danger, Success, Warning\n  c) **States**: Default, Hover, Pressed, Disabled, Loading\n  d) **Dark mode**: duplicate with inverted background/text colors\n- Arrange output on same page or new frame? (default: new container frame)\n\n## Steps\n\n### 1. Inspect the source\nCall get_node(sourceNodeId) to understand:\n- Width, height, position\n- Fill colors (note hex values)\n- Text content and sizes\n- Child structure\n\n### 2. Plan the variant grid\nCalculate layout:\n- Each clone = source width x source height\n- Gap between clones = 24px\n- Label each clone with its variant name (create_text node below each)\n- Total container width = (cloneWidth + 24) x columns\n\n### 3. Create container frame (if requested)\ncreate_frame(name=\"Variants/ComponentName\", width=totalWidth, height=totalHeight,\n             layoutMode=\"HORIZONTAL\", itemSpacing=24, paddingTop=32, paddingLeft=32,\n             paddingRight=32, paddingBottom=32)\n\n### 4. For each variant\n\n**Sizes:**\n- Clone source: clone_node(sourceId, parentId=containerId)\n- Compute scale factor (SM=0.75, MD=1.0, LG=1.5)\n- resize_nodes to new dimensions\n- For TEXT children: set_text to same content (font size cannot be changed via MCP; note this limitation)\n- rename_node to \"ComponentName/SM\" etc.\n\n**Color themes:**\n- Clone source: clone_node(sourceId, parentId=containerId)\n- For each fill-bearing child: set_fills(nodeId, color=themeHex)\n- Color mapping suggestion:\n  - Primary: use brand primary color\n  - Secondary: use brand secondary color\n  - Danger: #EF4444\n  - Success: #22C55E\n  - Warning: #F59E0B\n- rename_node to \"ComponentName/Primary\" etc.\n\n**States:**\n- Clone source: clone_node(sourceId, parentId=containerId)\n- Disabled: set_fills on background to gray (#94A3B8), reduce fill opacity of text nodes\n- Hover: slightly lighten the primary fill\n- rename_node to \"ComponentName/Hover\" etc.\n\n**Dark mode:**\n- Clone source: clone_node(sourceId, parentId=containerId)\n- Swap background fill to dark (#1E293B or similar)\n- Swap text fills to light (#F8FAFC)\n- rename_node to \"ComponentName/Dark\"\n\n### 5. Summarize\nReport all created node IDs and names. Ask the user if they want further adjustments.\n\n## Rules\n- Always inspect the source node before cloning.\n- Never modify the original source node.\n- Keep all variants on the same page unless the user requests otherwise.\n- Add a text label below each variant showing its name.\n"
+  }
+ ]
+}
