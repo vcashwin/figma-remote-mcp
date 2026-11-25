@@ -46,7 +46,7 @@ const HTML_HEADERS = {
   'content-type': 'text/html;charset=UTF-8',
   'cache-control': 'no-store',
   'x-frame-options': 'DENY',
-  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
   'referrer-policy': 'no-referrer',
 };
 const CORS = {
