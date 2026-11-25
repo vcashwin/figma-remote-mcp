@@ -136,6 +136,7 @@ export function desktopShim(plugins = []) {
   let req = /** @type {any} */ (null);
   /** @param {string} needle @param {(exports: any) => any} pick */
   const findExport = (needle, pick) => {
+    if (!w.rspackChunk_figma_web_bundler) throw new Error("Figma's code hasn't loaded yet.");
     if (!req) w.rspackChunk_figma_web_bundler.push([[`figma-remote-${Date.now()}`], {}, (/** @type {any} */ r) => (req = r)]);
     for (const id of Object.keys(req.m)) {
       if (!String(req.m[id]).includes(needle)) continue;
@@ -194,8 +195,14 @@ export function desktopShim(plugins = []) {
       pluginsAllowed: () => typeof w.figma === 'object' && w.figma !== null,
       /** What Figma says about the open file: loaded, and whether this account may edit it and run plugins in it */
       fileState() {
-        const st = store().getState();
-        return { loaded: !!st.mirror?.appModel?.isInitialized, canEdit: st.openFile?.canEdit, canRunExtensions: st.openFile?.canRunExtensions };
+        // while the page is still loading Figma's code, nothing is known yet
+        if (!w.rspackChunk_figma_web_bundler) return { loaded: false };
+        try {
+          const st = store().getState();
+          return { loaded: !!st.mirror?.appModel?.isInitialized, canEdit: st.openFile?.canEdit, canRunExtensions: st.openFile?.canRunExtensions };
+        } catch {
+          return { loaded: false };
+        }
       },
       /** Whether the plugin's main thread is running and listening */
       pluginRunning: () => !!toMain && heard,

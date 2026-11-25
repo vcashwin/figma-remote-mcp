@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// Latency benchmark on a real file: cold start (browser, editor, plugin) and warm calls per tool.
-//   node scripts/bench.mjs <fileKey|url> [runs=15]      (uses the `login` profile; read-only tools only)
+// Latency benchmark on a real file (uses the `login` profile; read-only tools only):
+//  1. in-process: cold start (browser, editor, plugin) and warm calls per tool
+//  2. over MCP stdio, as a client sees it: initialize, tools/list, the first call after the warm-up, warm calls
+//   node scripts/bench.mjs <fileKey|url> [runs=20]      (part 2 warms the most recent file: open <file> first)
 import { createEngine } from '../src/engine.js';
 import { defaultProfile, openProfile } from '../src/login.js';
+import { pct, startClient } from './mcp-client.mjs';
 
 const [file, runsArg] = process.argv.slice(2);
 if (!file) throw new Error('usage: node scripts/bench.mjs <fileKey|url> [runs]');
-const runs = Number(runsArg ?? 15);
+const runs = Number(runsArg ?? 20);
 const t0 = performance.now();
 const since = () => `${((performance.now() - t0) / 1000).toFixed(2)}s`;
 const log = { debug() {}, info: (/** @type {string} */ s) => console.log(`  ${since()} ${s}`), warn: console.warn, error: console.error };
@@ -16,7 +19,6 @@ const ms = async (/** @type {() => Promise<any>} */ fn) => {
   if (r?.isError) throw new Error(r.content[0].text);
   return performance.now() - s;
 };
-const pct = (/** @type {number[]} */ xs, /** @type {number} */ p) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor((p / 100) * xs.length))];
 
 const context = await openProfile(defaultProfile(), { headless: true });
 console.log(`browser launched         ${since()}`);
@@ -47,3 +49,16 @@ try {
 } finally {
   await engine.close();
 }
+
+console.log('\nover MCP stdio');
+const client = startClient();
+const [init] = await client.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'bench' } });
+const [list] = await client.rpc('tools/list');
+console.log(`initialize               ${init.toFixed(0)}ms\ntools/list               ${list.toFixed(0)}ms`);
+await new Promise((r) => setTimeout(r, 30_000)); // an agent reads and plans; the warm-up opens the most recent file
+const [firstCall, reply] = await client.call('get_metadata', { fileKey: file });
+console.log(`first call after 30 s     ${firstCall.toFixed(0)}ms${reply.result?.isError ? ' (error)' : ''}  (warm if <file> is the most recently opened)`);
+const xs = [];
+for (let i = 0; i < runs; i++) xs.push((await client.call('get_pages', {}))[0]);
+console.log(`get_pages over stdio     p50 ${pct(xs, 50).toFixed(1)}ms  p95 ${pct(xs, 95).toFixed(1)}ms  (${runs} runs)`);
+await client.close();

@@ -116,33 +116,63 @@ apply to them.
 
 ## Speed and resilience
 
-Measured on an 88-page design system file (`node scripts/bench.mjs <file>`, Apple M-series, local mode):
+`node scripts/bench.mjs <file>` on an 88-page design system file (Apple M-series, local mode, 20 runs):
 
 | | p50 | p95 |
 | --- | --- | --- |
-| `initialize` / `tools/list` (static catalog, no editor) | 149 ms / 5 ms | |
-| warm call over MCP stdio (`get_pages`) | 8 ms | 17 ms |
-| `get_metadata` / `get_design_context` (depth 2) / `get_node` | 6 / 26 / 36 ms | 8 / 29 / 318 ms |
-| `get_variable_defs` | 347 ms | 366 ms |
-| `get_screenshot` (large frame, scale 1) | 1.4 s | 2.4 s |
-| first call on a file the warm-up already opened | 17 ms | |
-| first call on a cold file: editor 5 s + Figma loading the whole document | 7 s (small) to 22 s (88 pages) | |
+| `initialize` / `tools/list` (static catalog, no editor) | 169 ms / 6 ms | |
+| warm call over MCP stdio (`get_pages`) | 8 ms | 16 ms |
+| `get_metadata` / `get_design_context` (depth 2) / `get_node` | 7 / 25 / 35 ms | 10 / 26 / 317 ms |
+| `get_variable_defs` | 348 ms | 393 ms |
+| `get_screenshot` (large frame, scale 1) | 1.4 s | 1.9 s |
+| first call 30 s after `initialize`, on the file the warm-up opened | 31 ms | |
+| first call on a cold file: editor 5.5 s, then Figma loads the whole document | 18 s (88 pages; a one-page draft: ~7 s) | |
 
-- **Warm-up:** on `initialize`, the server opens your most recently opened Figma file in the background (turn it off with
-  `FIGMA_WARM=0`). The first call usually finds it warm.
-- **Files stay open:** idle files stay open but frozen, so another call on them is instant without burning CPU.
+- **Warm-up:** on `initialize`, the server opens your most recently opened Figma file in the background (turn it off
+  with `FIGMA_WARM=0`), so the first call usually finds it warm.
+- **Files stay open:** files stay open and frozen between calls (a frozen editor uses a fraction of the CPU).
   - **Local:** the last 3 files stay open.
-  - **Hosted:** 2 files per account (`MAX_FILES`), for 30 idle minutes (`IDLE_MINUTES`).
-- **The cold floor is Figma's own load,** the same wait as opening the file in the app. Figma allows plugins only
-  once the document has loaded; starting earlier was tried, and Figma drops the plugin.
-- **Recovery** (exercised by `node scripts/chaos.mjs <file>`):
-  - A crashed page reopens on the next call.
-  - A reloaded editor (Figma ships a release) gets its plugin restarted.
-  - A Chrome process that died is relaunched.
-  - A read that a reload interrupts runs again by itself. A write is never sent twice: you're told to check the file.
-- **Long-lived editors:** pages are reloaded between calls after 4 hours, before Figma's editor grows too large.
-- **Never cut short:** a plugin start Figma drops is retried. An evicted or idle account closes only after its running
-  calls finish, and only once Figma confirms its edits are saved.
+  - **Hosted:** 2 files per account (`MAX_FILES`), for 30 idle minutes (`IDLE_MINUTES`). Each open file holds about 2 GB.
+- **The cold floor is Figma's own load,** the same wait as opening the file in the app. Figma allows plugins only once
+  the document has loaded; a plugin started earlier is dropped. A small viewport and blocked telemetry take ~10% off it.
+
+`node scripts/chaos.mjs <file>` breaks it on purpose; every step must recover by itself:
+
+- **A crashed page** is dropped and reopened on the next call.
+- **A reload during a read:** Figma reloads the editor when it ships a release, and the read runs again. A write is
+  never sent twice: if the editor goes away after a write was sent, you're told to check the file.
+- **A reload between calls:** the plugin is restarted.
+- **A frozen page** answers immediately.
+- **A killed Chrome** under the stdio server is relaunched for the next call.
+
+Beyond what `chaos.mjs` covers:
+
+- A plugin start that Figma drops is retried after 10 s.
+- A request that takes longer than 120 s closes its page, so a hung plugin starts fresh. A write that timed out is
+  reported as uncertain.
+- A file page older than 4 hours is closed at its next use and opened again (that call pays a cold open), before a
+  long-lived editor grows too large.
+- Closing or freezing a page waits up to 15 s for Figma to confirm its edits are saved.
+- An evicted or idle hosted account closes only after its running calls finish.
+- A hosted account whose browser died gets a new context.
+- A session Figma signed out is reported as such (sign in again), not as a timeout.
+
+## Compared with Figma Desktop's local MCP
+
+| | Figma Desktop (`127.0.0.1:3845`) | figma-remote-mcp |
+| --- | --- | --- |
+| Needs | the desktop app, open, with the file in the active tab | nothing installed in Figma; runs headless anywhere |
+| Who can use it | a Dev or Full seat on a paid plan; MCP rate limits apply | any plan; files your account can edit; no MCP limits |
+| Default tools | 6 Dev Mode tools | 71 Plugin API tools, reading and writing |
+| Picking the file | the active tab and its selection | `fileKey` (key or URL) per call |
+| `get_design_context` | Figma's React + Tailwind code, a screenshot, asset links | a structured node tree (layout, styles, text, variables); no code generation |
+| `get_metadata` | XML of the node tree | the file's name and pages (`get_document` / `get_design_context` give the tree) |
+| `get_screenshot`, `get_variable_defs` | PNG; a `name → value` map | PNG/JPG/SVG of any nodes; collections, modes and values |
+| Writing | none (Code Connect mappings only) | frames, text, styles, variables, components, prototypes, pages |
+| Figma's own tools, exactly | yes | with `--dev-mode`, as `dev_mode_*`: the same page code, so the same output and the same seat check |
+
+So the tool names overlap, but by default the answers are shaped differently: they come from the Plugin API rather
+than Figma's Dev Mode code generator, which is the part Figma reserves for paid seats.
 
 ## Troubleshooting
 

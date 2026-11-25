@@ -4,8 +4,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { CATALOG_TTL, createEngine, useStaticCache } from './engine.js';
-import { CHROMIUM_ARGS, CONTEXT_OPTIONS, isSignedOut } from './figma.js';
+import { CATALOG_TTL, createEngine, isAlive, useStaticCache } from './engine.js';
+import { CHROMIUM_ARGS, CONTEXT_OPTIONS, WARM, isSignedOut } from './figma.js';
 import { playwrightCookies } from './session.js';
 
 /**
@@ -22,7 +22,7 @@ export function createPool({
   maxFiles = Number(process.env.MAX_FILES || 2),
   cacheDir = process.env.STATIC_CACHE_DIR || join(homedir(), '.cache', 'figma-remote-mcp'),
   openEngine,
-  warmRecent = process.env.FIGMA_WARM !== '0',
+  warmRecent = WARM,
 }) {
   /** @type {Promise<import('playwright').Browser> | null} */
   let browser = null;
@@ -106,10 +106,17 @@ export function createPool({
         const restart = () => {
           const old = a.engine;
           a.engine = start(id, cookies);
+          // the entry may have left the map meanwhile (Chrome disconnected, a failed start): put it back, so its
+          // context is still idle-closed and evicted like any other
+          if (accounts.get(id) !== a) {
+            const other = accounts.get(id);
+            accounts.set(id, a);
+            if (other) void other.queue.then(() => other.engine.then((e) => e.close(), () => {}));
+          }
           void old.then((e) => e.close(), () => {});
         };
         // the browser behind it died: a new context first
-        if (!(await a.engine.then((e) => e.alive !== false, () => false))) restart();
+        if (!(await a.engine.then(isAlive, () => false))) restart();
         try {
           return await fn(await a.engine);
         } catch (err) {

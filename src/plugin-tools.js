@@ -15,11 +15,14 @@ const TOOLS = catalog.tools;
 const PROMPTS = catalog.prompts;
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
-/** The MCP catalog (without the routing rule) */
+/** Tools that only read: safe to run again when the editor reloads or crashes under them @param {string} name */
+export const isReadTool = (name) => /^(get|search|scan|export)_/.test(name);
+
+/** The MCP catalog (without the routing rule), with read-only / destructive hints */
 export const pluginTools = () =>
   TOOLS.map(({ nodeIds, ...tool }) => ({
     ...tool,
-    annotations: /^(get|search|scan|export)_/.test(tool.name)
+    annotations: isReadTool(tool.name)
       ? { readOnlyHint: true }
       : { readOnlyHint: false, destructiveHint: /^(delete|detach|ungroup|remove)_/.test(tool.name) },
   }));
