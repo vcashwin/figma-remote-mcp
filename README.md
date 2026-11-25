@@ -114,6 +114,36 @@ apply to them.
 - **Screenshots** come back as image content. With `--dev-mode`, asset links in `dev_mode_get_design_context` point at
   this server and last an hour.
 
+## Speed and resilience
+
+Measured on an 88-page design system file (`node scripts/bench.mjs <file>`, Apple M-series, local mode):
+
+| | p50 | p95 |
+| --- | --- | --- |
+| `initialize` / `tools/list` (static catalog, no editor) | 149 ms / 5 ms | |
+| warm call over MCP stdio (`get_pages`) | 8 ms | 17 ms |
+| `get_metadata` / `get_design_context` (depth 2) / `get_node` | 6 / 26 / 36 ms | 8 / 29 / 318 ms |
+| `get_variable_defs` | 347 ms | 366 ms |
+| `get_screenshot` (large frame, scale 1) | 1.4 s | 2.4 s |
+| first call on a file the warm-up already opened | 17 ms | |
+| first call on a cold file: editor 5 s + Figma loading the whole document | 7 s (small) to 22 s (88 pages) | |
+
+- **Warm-up:** on `initialize`, the server opens your most recently opened Figma file in the background (turn it off with
+  `FIGMA_WARM=0`). The first call usually finds it warm.
+- **Files stay open:** idle files stay open but frozen, so another call on them is instant without burning CPU.
+  - **Local:** the last 3 files stay open.
+  - **Hosted:** 2 files per account (`MAX_FILES`), for 30 idle minutes (`IDLE_MINUTES`).
+- **The cold floor is Figma's own load,** the same wait as opening the file in the app. Figma allows plugins only
+  once the document has loaded; starting earlier was tried, and Figma drops the plugin.
+- **Recovery** (exercised by `node scripts/chaos.mjs <file>`):
+  - A crashed page reopens on the next call.
+  - A reloaded editor (Figma ships a release) gets its plugin restarted.
+  - A Chrome process that died is relaunched.
+  - A read that a reload interrupts runs again by itself. A write is never sent twice: you're told to check the file.
+- **Long-lived editors:** pages are reloaded between calls after 4 hours, before Figma's editor grows too large.
+- **Never cut short:** a plugin start Figma drops is retried. An evicted or idle account closes only after its running
+  calls finish, and only once Figma confirms its edits are saved.
+
 ## Troubleshooting
 
 - **"Figma doesn't run plugins in this file"**: the file is view-only for this account. Ask for edit access, or

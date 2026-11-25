@@ -17,6 +17,14 @@ const PLUGIN = {
   html: '<!doctype html><title>figma-remote-mcp</title>',
 };
 const PLUGIN_TIMEOUT = 120_000;
+// A long-lived editor grows (Figma's draw loop, sync socket); pages are reloaded between calls after this long.
+const MAX_PAGE_AGE = 4 * 3_600_000;
+// The editor renders for nobody: a small viewport costs less, and Figma's analytics/telemetry need not run at all
+// (measured: ~10% faster cold opens).
+const VIEWPORT = { width: 640, height: 400 };
+const TELEMETRY = /(datadoghq|sentry\.io|segment\.(io|com)|statsig|amplitude|fullstory|google-analytics|googletagmanager|doubleclick|\/api\/web_logger|\/api\/figment-proxy)/;
+/** Tools that only read: safe to run again when the editor reloads or crashes under them */
+const isRead = (/** @type {string} */ tool) => /^(get|search|scan|export)_/.test(tool);
 const SAVE_TIMEOUT = 15_000;
 
 const OPEN_TIMEOUT = 90_000;
@@ -34,8 +42,9 @@ const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'im
 
 const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 const messageOf = (/** @type {unknown} */ err) => String(err instanceof Error ? err.message : err);
+/** The page navigated, reloaded, crashed or closed under a call */
 const navigating = (/** @type {unknown} */ err) =>
-  /context was destroyed|Target closed|frame was detached|Execution context|navigat/i.test(messageOf(err));
+  /context was destroyed|Target closed|Target crashed|crashed|has been closed|frame was detached|Execution context|navigat/i.test(messageOf(err));
 /** The page's own error text, without Playwright's wrapping @param {unknown} err */
 const pageMessage = (err) => messageOf(err).replace(/^page\.evaluate: (Error: )?/, '').split('\n    at ')[0];
 /** @param {string} text @returns {ToolResult} */
@@ -112,8 +121,10 @@ export async function resolveAssets(result, image, putAsset, log) {
  */
 export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
   await context.addInitScript(desktopShim, [PLUGIN]);
-  /** @type {Map<string, { page: import('playwright').Page, opening: Promise<void>, used: number }>} */
+  /** @type {Map<string, { page: import('playwright').Page, opening: Promise<void>, used: number, openedAt: number }>} */
   const pages = new Map();
+  let closed = false;
+  context.on('close', () => (closed = true)); // the browser died or was closed: this engine is done
   /** The file a call without `fileKey` works on: the last one used. @type {{ key: string, editor: string } | null} */
   let current = null;
   /** @type {{ at: number, tools: Tool[] } | null} */
@@ -202,7 +213,11 @@ export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
   /** The page for a file, opened when needed @param {{ key: string, editor: string }} file */
   async function pageFor(file) {
     const open = pages.get(file.key);
-    if (open && !open.page.isClosed()) {
+    if (open && !open.page.isClosed() && Date.now() - open.openedAt > MAX_PAGE_AGE) {
+      log.info(`recycling a file page after ${Math.round((Date.now() - open.openedAt) / 3_600_000)}h`);
+      pages.delete(file.key);
+      await closePage(open.page);
+    } else if (open && !open.page.isClosed()) {
       open.used = Date.now();
       await open.opening;
       return open.page;
@@ -213,12 +228,20 @@ export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
       await closePage(oldest.page);
     }
     const page = await context.newPage();
+    await page.setViewportSize(VIEWPORT);
+    await page.route(TELEMETRY, (r) => r.abort());
+    // A crashed page leaves the pool; the next call opens the file again.
+    page.on('crash', () => {
+      log.warn('a file page crashed; it reopens on the next call');
+      if (pages.get(file.key)?.page === page) pages.delete(file.key);
+      void page.close().catch(() => {});
+    });
     const started = Date.now();
     const opening = (async () => {
       await page.goto(fileUrl(file), { waitUntil: 'domcontentloaded', timeout: OPEN_TIMEOUT });
       await awake(page, () => whenReady(page));
     })();
-    pages.set(file.key, { page, opening, used: Date.now() });
+    pages.set(file.key, { page, opening, used: Date.now(), openedAt: Date.now() });
     try {
       await opening;
     } catch (err) {
@@ -258,9 +281,24 @@ export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
    */
   async function pluginPage(file) {
     const page = await pageFor(file);
+    // one start at a time per page (a warm-up and a call may ask together)
+    let starting = pluginStarts.get(page);
+    if (!starting) {
+      starting = startPlugin(page).finally(() => pluginStarts.delete(page));
+      pluginStarts.set(page, starting);
+    }
+    await starting;
+    return page;
+  }
+
+  /** @type {WeakMap<import('playwright').Page, Promise<void>>} */
+  const pluginStarts = new WeakMap();
+  /** Starts the tools plugin in the page unless it is running @param {import('playwright').Page} page */
+  async function startPlugin(page) {
     await awake(page, async () => {
+      const waitStarted = Date.now();
       const deadline = Date.now() + OPEN_TIMEOUT;
-      let started = false;
+      let started = 0;
       let loadedAt = 0;
       while (Date.now() < deadline) {
         const s = await page
@@ -269,20 +307,24 @@ export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
             return { running: r.pluginRunning(), allowed: r.pluginsAllowed(), file: r.fileState() };
           })
           .catch((err) => (navigating(err) ? null : Promise.reject(err)));
-        if (s?.running) return;
+        if (s?.running) {
+          if (started) log.info(`plugin ready in ${Date.now() - waitStarted}ms`);
+          return;
+        }
         // Figma reports the file loaded a moment before its permissions (canEdit reads false until then).
         if (s?.file.loaded) loadedAt ||= Date.now();
         if (s?.file.loaded && !s.allowed && (s.file.canRunExtensions === false || (s.file.canEdit === false && Date.now() - loadedAt > 15_000))) {
           throw figmaError('forbidden', "Figma doesn't run plugins in this file for this account (it is view-only, or plugins are turned off). Ask for edit access, or duplicate the file to your drafts.");
         }
+        // Started but silent for 10 s: Figma dropped the run (or the page reloaded); start it again.
+        if (started && Date.now() - started > 10_000) started = 0;
         if (s?.allowed && !started) {
-          started = await page.evaluate(() => /** @type {any} */ (window).__figmaRemote.runPlugin(1)).then(() => true, () => false);
+          started = await page.evaluate(() => /** @type {any} */ (window).__figmaRemote.runPlugin(1)).then(() => Date.now(), () => 0);
         }
         await sleep(300);
       }
       throw figmaError('unavailable', "The tools plugin didn't start in Figma's editor. Try again.");
     });
-    return page;
   }
 
   /**
@@ -380,22 +422,50 @@ export async function createEngine({ context, putAsset, log, maxPages = 3 }) {
       } catch (err) {
         return errorResult(messageOf(err));
       }
-      let page;
-      try {
-        page = await pluginPage(file);
-      } catch (err) {
-        if (/** @type {any} */ (err)?.code === 'forbidden') return errorResult(messageOf(err));
-        throw err;
+      // A reload or crash under a read runs it again on the reopened editor; a write is never sent twice.
+      for (let attempt = 0; ; attempt++) {
+        let page;
+        try {
+          page = await pluginPage(file);
+        } catch (err) {
+          if (/** @type {any} */ (err)?.code === 'forbidden') return errorResult(messageOf(err));
+          throw err;
+        }
+        current = file;
+        const p = /** @type {import('playwright').Page} */ (page);
+        /** @type {any} */
+        let response;
+        try {
+          response = await awake(p, () =>
+            Promise.race([
+              p.evaluate((r) => /** @type {any} */ (window).__figmaRemote.request(r), request),
+              sleep(PLUGIN_TIMEOUT).then(() => ({ error: `${tool} took longer than ${PLUGIN_TIMEOUT / 1000}s.` })),
+            ]),
+          );
+        } catch (err) {
+          if (!navigating(err)) return errorResult(pageMessage(err));
+          if (isRead(tool) && attempt === 0) {
+            log.warn(`${tool}: the editor reloaded or crashed; running it again`);
+            continue;
+          }
+          return errorResult(`Figma's editor reloaded or crashed while ${tool} ran, so it may or may not have been applied. Check the file before running it again.`);
+        }
+        return pluginResult(tool, response);
       }
-      current = file;
-      const p = /** @type {import('playwright').Page} */ (page);
-      const response = await awake(p, () =>
-        Promise.race([
-          p.evaluate((r) => /** @type {any} */ (window).__figmaRemote.request(r), request),
-          sleep(PLUGIN_TIMEOUT).then(() => ({ error: `${tool} took longer than ${PLUGIN_TIMEOUT / 1000}s.` })),
-        ]),
-      ).catch((err) => ({ error: pageMessage(err) }));
-      return pluginResult(tool, response);
+    },
+
+    /** Opens the account's most recently opened file in the background, so the likely first call finds it warm. */
+    warm() {
+      if (pages.size) return;
+      recentFile()
+        .then((file) => pluginPage(file))
+        .then(() => log.info('warmed the most recent file'))
+        .catch((err) => log.warn(`warm-up: ${messageOf(err)}`));
+    },
+
+    /** False once the browser behind this engine has gone (crashed or closed) */
+    get alive() {
+      return !closed;
     },
 
     async close() {

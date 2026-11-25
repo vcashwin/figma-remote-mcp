@@ -9,10 +9,10 @@ import { defaultProfile, openProfile, whoAmI } from './login.js';
 import { dispatch } from './mcp.js';
 
 /**
- * @param {{ profile?: string, headful?: boolean, devMode?: boolean, log: import('./figma.js').Log, input?: NodeJS.ReadableStream,
+ * @param {{ profile?: string, headful?: boolean, devMode?: boolean, warm?: boolean, log: import('./figma.js').Log, input?: NodeJS.ReadableStream,
  *   output?: NodeJS.WritableStream }} options
  */
-export async function startStdio({ profile = defaultProfile(), headful = false, devMode = false, log, input = process.stdin, output = process.stdout }) {
+export async function startStdio({ profile = defaultProfile(), headful = false, devMode = false, warm = process.env.FIGMA_WARM !== '0', log, input = process.stdin, output = process.stdout }) {
   /** @type {number} */
   let port = 0;
   const assets = createAssetStore({ baseUrl: () => `http://127.0.0.1:${port}` });
@@ -28,8 +28,10 @@ export async function startStdio({ profile = defaultProfile(), headful = false, 
   /** @type {Promise<import('./engine.js').Engine> | null} */
   let engine = null;
   // Started on first use, so `initialize` answers at once and a client that never calls a tool never starts Chrome.
-  const getEngine = () =>
-    (engine ??= (async () => {
+  const getEngine = async () => {
+    // Chrome died (or was closed): start a new one
+    if (engine && !(await engine.then((e) => e.alive, () => false))) engine = null;
+    return (engine ??= (async () => {
       const context = await openProfile(profile, { headless: !headful });
       if ((await whoAmI(context)).status === 401) {
         await context.close();
@@ -40,13 +42,18 @@ export async function startStdio({ profile = defaultProfile(), headful = false, 
       engine = null;
       throw err;
     }));
+  };
 
   let clientInfo = { name: 'unknown' };
   const ctx = {
     devMode,
     engine: getEngine,
     clientInfo: () => clientInfo,
-    onInitialize: (/** @type {{ name: string }} */ c) => (clientInfo = c),
+    onInitialize: (/** @type {{ name: string }} */ c) => {
+      clientInfo = c;
+      // the first call likely names the file you're working on: have the most recent one open and ready
+      if (warm) getEngine().then((e) => e.warm(), () => {});
+    },
   };
   /** @param {object} msg */
   const send = (msg) => output.write(`${JSON.stringify(msg)}\n`);

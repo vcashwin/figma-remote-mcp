@@ -11,17 +11,18 @@ import { playwrightCookies } from './session.js';
 /**
  * @param {{ log: import('./figma.js').Log, putAsset: import('./engine.js').PutAsset, idleMs?: number,
  *   maxAccounts?: number, maxFiles?: number, cacheDir?: string,
- *   openEngine?: (cookies: import('./figma.js').Cookie[]) => Promise<import('./engine.js').Engine> }} options
+ *   openEngine?: (cookies: import('./figma.js').Cookie[]) => Promise<import('./engine.js').Engine>, warmRecent?: boolean }} options
  *   maxFiles: open files per account; openEngine: a browser context with these cookies, and its engine
  */
 export function createPool({
   log,
   putAsset,
-  idleMs = 10 * 60_000,
+  idleMs = Number(process.env.IDLE_MINUTES || 30) * 60_000,
   maxAccounts = Number(process.env.MAX_ACCOUNTS || 6),
   maxFiles = Number(process.env.MAX_FILES || 2),
   cacheDir = process.env.STATIC_CACHE_DIR || join(homedir(), '.cache', 'figma-remote-mcp'),
   openEngine,
+  warmRecent = process.env.FIGMA_WARM !== '0',
 }) {
   /** @type {Promise<import('playwright').Browser> | null} */
   let browser = null;
@@ -102,14 +103,18 @@ export function createPool({
     run(id, cookies, fn) {
       const a = account(id, cookies);
       const run = a.queue.then(async () => {
+        const restart = () => {
+          const old = a.engine;
+          a.engine = start(id, cookies);
+          void old.then((e) => e.close(), () => {});
+        };
+        // the browser behind it died: a new context first
+        if (!(await a.engine.then((e) => e.alive !== false, () => false))) restart();
         try {
           return await fn(await a.engine);
         } catch (err) {
           if (!isSignedOut(err)) throw err;
-          // restart in place, so the retry stays in this account's queue
-          const old = a.engine;
-          a.engine = start(id, cookies);
-          void old.then((e) => e.close(), () => {});
+          restart(); // in place, so the retry stays in this account's queue
           return fn(await a.engine);
         }
       });
@@ -126,7 +131,10 @@ export function createPool({
     },
     /** Starts an account's browser context ahead of its first call (initialize does this). @param {string} id @param {import('./figma.js').Cookie[]} cookies */
     warm(id, cookies) {
-      account(id, cookies).engine.catch((err) => log.warn(`pool: warm-up failed: ${err?.message ?? err}`));
+      account(id, cookies).engine.then(
+        (e) => warmRecent && e.warm(),
+        (err) => log.warn(`pool: warm-up failed: ${err?.message ?? err}`),
+      );
     },
     async close() {
       for (const id of [...accounts.keys()]) await closeAccount(id);

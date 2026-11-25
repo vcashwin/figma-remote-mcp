@@ -16,7 +16,13 @@ const PROMPTS = catalog.prompts;
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
 /** The MCP catalog (without the routing rule) */
-export const pluginTools = () => TOOLS.map(({ nodeIds, ...tool }) => tool);
+export const pluginTools = () =>
+  TOOLS.map(({ nodeIds, ...tool }) => ({
+    ...tool,
+    annotations: /^(get|search|scan|export)_/.test(tool.name)
+      ? { readOnlyHint: true }
+      : { readOnlyHint: false, destructiveHint: /^(delete|detach|ungroup|remove)_/.test(tool.name) },
+  }));
 /** @param {string} name */
 export const isPluginTool = (name) => BY_NAME.has(name);
 
