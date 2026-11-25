@@ -1,0 +1,51 @@
+{
+  "name": "figma-remote-mcp",
+  "version": "0.1.0",
+  "description": "Figma's MCP without the desktop app and without seat or rate limits: 71 read/write tools through Figma's Plugin API, run by figma.com's own editor headless, on your machine (stdio) or hosted (HTTP + OAuth).",
+  "type": "module",
+  "bin": {
+    "figma-remote-mcp": "src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/cli.js serve",
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "keywords": [
+    "figma",
+    "mcp",
+    "model-context-protocol",
+    "figma-plugin",
+    "design-to-code",
+    "claude",
+    "cursor",
+    "codex",
+    "playwright",
+    "headless"
+  ],
+  "author": "vcashwin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vcashwin/figma-remote-mcp.git"
+  },
+  "homepage": "https://github.com/vcashwin/figma-remote-mcp#readme",
+  "dependencies": {
+    "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.8.3"
+  }
+}
