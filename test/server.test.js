@@ -81,6 +81,8 @@ async function toSignIn(s) {
   const html = await consent.text();
   assert.match(html, /Claude &#60;Code&#62;/, 'the client name is escaped');
   assert.match(html, /Unverified app/);
+  // a form-action CSP would also block the redirect after the POST (to the client's callback): browsers refuse it
+  assert.doesNotMatch(consent.headers.get('content-security-policy') ?? '', /form-action/);
   const signIn = await s.call('/authorize', s.form({ state: field(html, 'state'), csrf_token: field(html, 'csrf_token'), action: 'approve' }, cookieOf(consent, 'CSRF')));
   return { reg, signIn, page: await signIn.text(), cookie: cookieOf(signIn, 'SIGNIN') };
 }
