@@ -4,7 +4,7 @@
 Cursor, Codex or any MCP client, on your machine or hosted for a team.
 
 figma-remote-mcp runs figma.com's own editor in headless Chromium, standing in for Figma Desktop's shell, and serves
-**71 tools through Figma's Plugin API**: read a design (`get_design_context`, `get_node`, `search_nodes`,
+**72 tools through Figma's Plugin API**: read a design (`get_design_context`, `get_node`, `search_nodes`,
 `get_variable_defs`, `get_styles`, `get_screenshot`, …), and write one (`create_frame`, `create_text`, `set_fills`,
 `set_auto_layout`, variables, styles, components, prototypes, pages, …).
 
@@ -163,7 +163,7 @@ Beyond what `chaos.mjs` covers:
 | --- | --- | --- |
 | Needs | the desktop app, open, with the file in the active tab | nothing installed in Figma; runs headless anywhere |
 | Who can use it | a Dev or Full seat on a paid plan; MCP rate limits apply | any plan; files your account can edit; no MCP limits |
-| Default tools | 6 Dev Mode tools | 71 Plugin API tools, reading and writing |
+| Default tools | 6 Dev Mode tools | 72 Plugin API tools, reading and writing |
 | Picking the file | the active tab and its selection | `fileKey` (key or URL) per call |
 | `get_design_context` | Figma's React + Tailwind code, a screenshot, asset links | a structured node tree (layout, styles, text, variables); no code generation |
 | `get_metadata` | XML of the node tree | the file's name and pages (`get_document` / `get_design_context` give the tree) |

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isPluginTool, pluginPrompt, pluginPrompts, pluginRequest, pluginResult, pluginTools } from '../src/plugin-tools.js';
 
-test('catalog: 71 tools with schemas, no disk-writing tools, 12 prompts', () => {
+test('catalog: 72 tools with schemas, no disk-writing tools, 12 prompts', () => {
   const tools = pluginTools();
-  assert.equal(tools.length, 71);
+  assert.equal(tools.length, 72);
   assert.ok(tools.every((t) => t.inputSchema?.type === 'object' && !('nodeIds' in t && typeof t.nodeIds === 'string')));
   assert.ok(!isPluginTool('save_screenshots') && !isPluginTool('export_frames_to_pdf'));
   for (const name of ['get_design_context', 'get_screenshot', 'create_frame', 'set_text', 'get_variable_defs']) assert.ok(isPluginTool(name), name);
