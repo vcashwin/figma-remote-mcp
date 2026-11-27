@@ -209,7 +209,13 @@ export function desktopShim(plugins = []) {
       /** Runs local plugin `id` the way Plugins › Development › <name> does. @param {number} id */
       runPlugin(id) {
         const s = store();
-        const plugin = s.getState().localPlugins?.[id];
+        let plugin = s.getState().localPlugins?.[id];
+        // Figma (late Nov 2026) keeps local plugins outside Redux: build the entry its loader would.
+        if (!plugin && plugins[id - 1]) {
+          const l = local(id);
+          const m = JSON.parse(l.manifest);
+          plugin = { plugin_id: m.id || '', name: m.name, manifest: m, localFileId: id, localFilePath: l.path };
+        }
         if (!plugin) throw new Error(`Local plugin ${id} is not loaded yet.`);
         if (plugin.error) throw new Error(`Local plugin ${id}: ${plugin.error.text}`);
         hookUi();
